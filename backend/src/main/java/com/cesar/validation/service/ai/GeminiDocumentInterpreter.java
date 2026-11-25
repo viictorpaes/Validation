@@ -78,17 +78,16 @@ public class GeminiDocumentInterpreter implements DocumentAiInterpreter {
         }
 
         try {
-            String requestBody = buildInteractionsRequestPayload(ocrText, informedDocumentType);
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(appProperties.getAi().getGemini().getApiUrl()))
-                .timeout(Duration.ofSeconds(appProperties.getAi().getGemini().getTimeoutSeconds()))
-                .header("Content-Type", "application/json")
-                .header("x-goog-api-key", apiKey)
-                .header("Api-Revision", API_REVISION)
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
+            String primaryModel = appProperties.getAi().getGemini().getModel();
+            HttpResponse<String> response = sendInteractionRequest(ocrText, informedDocumentType, apiKey, primaryModel);
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if ((response.statusCode() == 503 || response.statusCode() == 429)
+                && !"gemini-3.5-flash-lite".equals(primaryModel)) {
+                log.warn("Modelo {} indisponível temporariamente (HTTP {}); tentando modelo gemini-3.5-flash-lite.",
+                    primaryModel, response.statusCode());
+                response = sendInteractionRequest(ocrText, informedDocumentType, apiKey, "gemini-3.5-flash-lite");
+            }
+
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.error("API Google Gemini retornou status HTTP {}", response.statusCode());
                 return fallbackOrEmpty(ocrText, "HEURISTIC_GEMINI_ERROR");
@@ -119,7 +118,29 @@ public class GeminiDocumentInterpreter implements DocumentAiInterpreter {
         return new AiInterpretationResult(empty, "GEMINI_UNAVAILABLE", false);
     }
 
-    private String buildInteractionsRequestPayload(String ocrText, DocumentType informedType) throws IOException {
+    private HttpResponse<String> sendInteractionRequest(
+        String ocrText,
+        DocumentType informedDocumentType,
+        String apiKey,
+        String modelName
+    ) throws IOException, InterruptedException {
+        String requestBody = buildInteractionsRequestPayload(ocrText, informedDocumentType, modelName);
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(appProperties.getAi().getGemini().getApiUrl()))
+            .timeout(Duration.ofSeconds(appProperties.getAi().getGemini().getTimeoutSeconds()))
+            .header("Content-Type", "application/json")
+            .header("x-goog-api-key", apiKey)
+            .header("Api-Revision", API_REVISION)
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String buildInteractionsRequestPayload(
+        String ocrText,
+        DocumentType informedType,
+        String modelName
+    ) throws IOException {
         String systemInstruction = """
             Você é um extrator especializado em comprovantes de residência brasileiros.
             Sua única responsabilidade é extrair os campos solicitados a partir do texto OCR fornecido e retornar exclusivamente um JSON compatível com o schema definido.
@@ -162,7 +183,7 @@ public class GeminiDocumentInterpreter implements DocumentAiInterpreter {
         responseFormat.put("schema", jsonSchema);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", appProperties.getAi().getGemini().getModel());
+        payload.put("model", modelName);
         payload.put("system_instruction", systemInstruction.trim());
         payload.put("input", prompt);
         payload.put("store", false);
