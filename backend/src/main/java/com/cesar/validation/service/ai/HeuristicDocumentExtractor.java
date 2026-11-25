@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class HeuristicDocumentExtractor {
 
-    private static final Pattern CPF_PATTERN = Pattern.compile("\\b(\\d{3}\\.?\\d{3}\\.?\\d{3}-?\\d{2})\\b");
+    private static final Pattern CPF_PATTERN = Pattern.compile("\\b(\\d{3}[\\s.]?\\d{3}[\\s.]?\\d{3}[\\s\\-/]?\\d{2})\\b");
     private static final Pattern CEP_PATTERN = Pattern.compile("\\b(\\d{5}-?\\d{3})\\b");
     private static final Pattern NAME_LINE_PATTERN = Pattern.compile(
         "(?im)^\\s*(?:nome(?:\\s+do\\s+cliente|\\s+do\\s+titular)?|titular|cliente|consumidor|sacado)\\s*[:\\-]\\s*([^\\r\\n]{3,120})$"

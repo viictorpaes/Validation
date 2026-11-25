@@ -41,7 +41,8 @@ class ImageAndPdfPreprocessingTest {
 
         BufferedImage processed = imageService.preprocessSingleImage(source);
         assertNotNull(processed);
-        assertTrue(processed.getWidth() >= 600);
+        assertTrue(processed.getWidth() >= 1800);
+        assertTrue(processed.getHeight() >= 480);
 
         Path pdfFile = tempDir.resolve("comprovante_sintetico.pdf");
         try (PDDocument doc = new PDDocument()) {

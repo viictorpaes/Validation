@@ -6,7 +6,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.awt.image.RescaleOp;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -16,6 +15,7 @@ import nu.pattern.OpenCV;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfDouble;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.RotatedRect;
@@ -89,69 +89,104 @@ public class OpenCvImagePreprocessingService implements ImagePreprocessingServic
 
     private BufferedImage processWithOpenCv(BufferedImage sourceImage) {
         Mat bgrMat = null;
-        Mat resizedMat = null;
         Mat grayMat = null;
+        Mat resizedMat = null;
         Mat denoisedMat = null;
         Mat contrastMat = null;
         Mat deskewedMat = null;
-        Mat thresholdMat = null;
-        CLAHE clahe = null;
+        Mat paddedMat = null;
+        MatOfDouble mean = null;
+        MatOfDouble stdDev = null;
 
         try {
+            int originalWidth = sourceImage.getWidth();
+            int originalHeight = sourceImage.getHeight();
+
             bgrMat = bufferedImageToBgrMat(sourceImage);
 
-            // 1. Redimensionamento proporcional caso a imagem tenha baixa resolução (< 1100px)
-            if (bgrMat.cols() < 1100) {
+            // 1. Conversão para escala de cinza
+            grayMat = new Mat();
+            Imgproc.cvtColor(bgrMat, grayMat, Imgproc.COLOR_BGR2GRAY);
+
+            // 2. Upscaling bicúbico inteligente para recortes pequenos ou baixa resolução
+            double scale = computeOptimalScale(originalWidth, originalHeight);
+            if (scale > 1.05) {
                 resizedMat = new Mat();
-                double scale = 1400.0 / Math.max(1, bgrMat.cols());
                 Imgproc.resize(
-                    bgrMat,
+                    grayMat,
                     resizedMat,
-                    new Size(Math.round(bgrMat.cols() * scale), Math.round(bgrMat.rows() * scale)),
+                    new Size(Math.round(grayMat.cols() * scale), Math.round(grayMat.rows() * scale)),
                     0,
                     0,
                     Imgproc.INTER_CUBIC
                 );
             } else {
-                resizedMat = bgrMat.clone();
+                resizedMat = grayMat.clone();
             }
 
-            // 2. Conversão para escala de cinza
-            grayMat = new Mat();
-            Imgproc.cvtColor(resizedMat, grayMat, Imgproc.COLOR_BGR2GRAY);
+            // 3. Redução seletiva de ruídos (apenas filtro bilateral leve em fotos ruidosas,
+            //    preservando separação sub-pixel de dígitos adjacentes como "11" em recortes nítidos)
+            mean = new MatOfDouble();
+            stdDev = new MatOfDouble();
+            Core.meanStdDev(resizedMat, mean, stdDev);
+            double contrastStd = stdDev.toArray().length > 0 ? stdDev.toArray()[0] : 50.0;
 
-            // 3. Redução de ruídos preservando bordas tipográficas
             denoisedMat = new Mat();
-            Imgproc.GaussianBlur(grayMat, denoisedMat, new Size(3, 3), 0);
+            if (contrastStd < 38.0) {
+                // Foto escura/lavada com baixo contraste: filtro bilateral preserva bordas + CLAHE suave
+                Imgproc.bilateralFilter(resizedMat, denoisedMat, 5, 35, 35);
+                contrastMat = new Mat();
+                CLAHE clahe = Imgproc.createCLAHE(1.6, new Size(12, 12));
+                clahe.apply(denoisedMat, contrastMat);
+            } else {
+                // Imagem com bom contraste: normalização linear suave sem fundir glifos próximos
+                contrastMat = new Mat();
+                Core.normalize(resizedMat, contrastMat, 0, 255, Core.NORM_MINMAX);
+            }
 
-            // 4. Ajuste adaptativo de contraste local (CLAHE)
-            contrastMat = new Mat();
-            clahe = Imgproc.createCLAHE(2.0, new Size(8, 8));
-            clahe.apply(denoisedMat, contrastMat);
+            // 4. Correção de inclinação apenas para páginas completas inclinadas
+            if (originalHeight >= 450 && originalWidth >= 450) {
+                deskewedMat = correctSkewIfNeeded(contrastMat);
+            } else {
+                deskewedMat = contrastMat.clone();
+            }
 
-            // 5. Correção automática de inclinação/orientação leve (Deskew)
-            deskewedMat = correctSkewIfNeeded(contrastMat);
-
-            // 6. Binarização Otsu para maximizar nitidez no Tesseract OCR
-            thresholdMat = new Mat();
-            Imgproc.threshold(
+            // 5. Margem branca protetora recomendada pelo motor LSTM do Tesseract 5
+            paddedMat = new Mat();
+            Core.copyMakeBorder(
                 deskewedMat,
-                thresholdMat,
-                0,
-                255,
-                Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU
+                paddedMat,
+                24,
+                24,
+                24,
+                24,
+                Core.BORDER_CONSTANT,
+                new Scalar(255)
             );
 
-            return grayMatToBufferedImage(thresholdMat);
+            return grayMatToBufferedImage(paddedMat);
         } finally {
             releaseQuietly(bgrMat);
-            releaseQuietly(resizedMat);
             releaseQuietly(grayMat);
+            releaseQuietly(resizedMat);
             releaseQuietly(denoisedMat);
             releaseQuietly(contrastMat);
             releaseQuietly(deskewedMat);
-            releaseQuietly(thresholdMat);
+            releaseQuietly(paddedMat);
+            releaseQuietly(mean);
+            releaseQuietly(stdDev);
         }
+    }
+
+    private double computeOptimalScale(int width, int height) {
+        double scaleByWidth = width < 1800 ? 1800.0 / Math.max(1, width) : 1.0;
+        double scaleByHeight = height < 480 ? 480.0 / Math.max(1, height) : 1.0;
+        double desired = Math.max(scaleByWidth, scaleByHeight);
+        double capped = Math.min(desired, 3.2);
+        if (width * capped > 3800) {
+            capped = 3800.0 / width;
+        }
+        return Math.max(1.0, capped);
     }
 
     private Mat correctSkewIfNeeded(Mat grayInput) {
@@ -168,7 +203,7 @@ public class OpenCvImagePreprocessingService implements ImagePreprocessingServic
                 Imgproc.THRESH_BINARY_INV | Imgproc.THRESH_OTSU
             );
             Core.findNonZero(inverted, nonZeroCoords);
-            if (nonZeroCoords.empty() || nonZeroCoords.rows() < 150) {
+            if (nonZeroCoords.empty() || nonZeroCoords.rows() < 400) {
                 return grayInput.clone();
             }
 
@@ -185,7 +220,7 @@ public class OpenCvImagePreprocessingService implements ImagePreprocessingServic
                 angle = -angle;
             }
 
-            if (Math.abs(angle) < 0.8 || Math.abs(angle) > 20.0) {
+            if (Math.abs(angle) < 1.5 || Math.abs(angle) > 18.0) {
                 return grayInput.clone();
             }
 
@@ -245,20 +280,27 @@ public class OpenCvImagePreprocessingService implements ImagePreprocessingServic
     }
 
     private BufferedImage fallbackJava2dPreprocess(BufferedImage source) {
-        int targetWidth = source.getWidth() < 1100 ? source.getWidth() * 2 : source.getWidth();
-        int targetHeight = source.getWidth() < 1100 ? source.getHeight() * 2 : source.getHeight();
+        double scale = computeOptimalScale(source.getWidth(), source.getHeight());
+        int targetWidth = (int) Math.round(source.getWidth() * scale) + 48;
+        int targetHeight = (int) Math.round(source.getHeight() * scale) + 48;
         BufferedImage gray = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_BYTE_GRAY);
         Graphics2D g = gray.createGraphics();
         try {
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             g.setColor(Color.WHITE);
             g.fillRect(0, 0, targetWidth, targetHeight);
-            g.drawImage(source, 0, 0, targetWidth, targetHeight, null);
+            g.drawImage(
+                source,
+                24,
+                24,
+                targetWidth - 48,
+                targetHeight - 48,
+                null
+            );
         } finally {
             g.dispose();
         }
-        RescaleOp rescaleOp = new RescaleOp(1.25f, -15f, null);
-        return rescaleOp.filter(gray, null);
+        return gray;
     }
 
     private void releaseQuietly(Mat mat) {
