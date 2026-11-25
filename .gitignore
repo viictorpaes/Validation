@@ -12,11 +12,12 @@ backend/.mvn/wrapper/maven-wrapper.jar
 *.war
 hs_err_pid*
 
-# Local document storage (LGPD protection)
+# Local document storage & synthetic manual test samples (LGPD protection)
 uploads/
 backend/uploads/
 storage/
 tmp/
+samples/
 
 # Frontend / Node / Vite
 frontend/node_modules/
