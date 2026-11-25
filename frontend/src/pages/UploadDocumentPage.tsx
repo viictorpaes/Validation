@@ -63,6 +63,12 @@ export const UploadDocumentPage: React.FC = () => {
       return;
     }
 
+    const cpfDigits = cpf.replace(/\D/g, '');
+    if (cpfDigits.length > 0 && cpfDigits.length !== 11) {
+      setError('Quando informado, o CPF do titular deve conter exatamente 11 dígitos.');
+      return;
+    }
+
     if (!selectedFile) {
       setError('Selecione um arquivo PDF, PNG ou JPG antes de iniciar o processamento.');
       return;

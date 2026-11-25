@@ -240,6 +240,28 @@ export const ValidationResultsPage: React.FC = () => {
                     {result.extractedData.camposAusentes.join(', ')}
                   </div>
                 )}
+
+              {result.ocrPreview && (
+                <div style={{ marginTop: '1.15rem' }}>
+                  <div className="kv-label" style={{ marginBottom: '0.35rem' }}>
+                    Prévia do Texto Extraído pelo OCR (Dados Sensíveis Mascarados)
+                  </div>
+                  <div
+                    style={{
+                      padding: '0.75rem 0.9rem',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--color-background)',
+                      border: '1px solid var(--color-border)',
+                      fontSize: '0.8rem',
+                      color: 'var(--color-dark)',
+                      lineHeight: 1.5,
+                    }}
+                    data-testid="ocr-preview-box"
+                  >
+                    {result.ocrPreview}
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="card">
