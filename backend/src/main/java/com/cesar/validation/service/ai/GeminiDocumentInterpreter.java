@@ -94,7 +94,10 @@ public class GeminiDocumentInterpreter implements DocumentAiInterpreter {
             }
 
             String jsonContent = extractModelJsonOutput(response.body());
-            ExtractedDocumentDto structured = parseAndSanitizeStructuredJson(jsonContent);
+            ExtractedDocumentDto structured = enrichDocumentTypeIfExplicit(
+                parseAndSanitizeStructuredJson(jsonContent),
+                ocrText
+            );
             return new AiInterpretationResult(structured, "GEMINI_AI", true);
         } catch (IOException | InterruptedException | RuntimeException ex) {
             if (ex instanceof InterruptedException) {
@@ -278,6 +281,38 @@ public class GeminiDocumentInterpreter implements DocumentAiInterpreter {
             tipoDocumento,
             missing
         );
+    }
+
+    private ExtractedDocumentDto enrichDocumentTypeIfExplicit(ExtractedDocumentDto dto, String ocrText) {
+        if (dto == null) {
+            return null;
+        }
+        if (dto.tipoDocumento() == null || "OUTROS".equalsIgnoreCase(dto.tipoDocumento())) {
+            ExtractedDocumentDto heuristic = heuristicExtractor.extractFromText(ocrText);
+            if (heuristic.tipoDocumento() != null && !"OUTROS".equalsIgnoreCase(heuristic.tipoDocumento())) {
+                List<String> updatedMissing = HeuristicDocumentExtractor.computeMissingFields(
+                    dto.nomeTitular(),
+                    dto.cpf(),
+                    dto.endereco(),
+                    dto.cidade(),
+                    dto.estado(),
+                    dto.dataEmissao(),
+                    heuristic.tipoDocumento()
+                );
+                return new ExtractedDocumentDto(
+                    dto.nomeTitular(),
+                    dto.cpf(),
+                    dto.endereco(),
+                    dto.cidade(),
+                    dto.estado(),
+                    dto.cep(),
+                    dto.dataEmissao(),
+                    heuristic.tipoDocumento(),
+                    updatedMissing
+                );
+            }
+        }
+        return dto;
     }
 
     private String normalizeNullableField(JsonNode field) {

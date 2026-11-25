@@ -65,7 +65,7 @@ public class TesseractOcrService implements OcrExtractionService {
                 tesseract.setDatapath(datapath);
             }
             tesseract.setLanguage(language);
-            tesseract.setPageSegMode(3);
+            tesseract.setPageSegMode(6);
             tesseract.setOcrEngineMode(1);
             return tesseract.doOCR(image);
         } catch (TesseractException | UnsatisfiedLinkError | NoClassDefFoundError ex) {
@@ -87,7 +87,7 @@ public class TesseractOcrService implements OcrExtractionService {
                 "-l",
                 language,
                 "--psm",
-                "3"
+                "6"
             );
             Process process = pb.start();
             byte[] stdout = process.getInputStream().readAllBytes();
