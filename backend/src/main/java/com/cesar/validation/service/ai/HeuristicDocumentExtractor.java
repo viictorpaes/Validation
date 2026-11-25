@@ -147,20 +147,30 @@ public class HeuristicDocumentExtractor {
     private String inferDocumentType(String text) {
         String upper = text.toUpperCase(Locale.ROOT);
         if (upper.contains("SABESP") || upper.contains("COMPESA") || upper.contains("COPASA")
-            || upper.contains("SANEAMENTO") || upper.contains("CONTA DE ÁGUA") || upper.contains("CONTA DE AGUA")) {
+            || upper.contains("CAERN") || upper.contains("EMBASA") || upper.contains("SANEPAR")
+            || upper.contains("CEDAE") || upper.contains("CAGECE") || upper.contains("SANEAMENTO")
+            || upper.contains("CONTA DE ÁGUA") || upper.contains("CONTA DE AGUA")
+            || upper.contains("FORNECIMENTO DE AGUA") || upper.contains("FORNECIMENTO DE ÁGUA")) {
             return "CONTA_DE_AGUA";
         }
         if (upper.contains("ENEL") || upper.contains("NEOENERGIA") || upper.contains("CELPE")
-            || upper.contains("CEMIG") || upper.contains("ENERGIA ELÉTRICA") || upper.contains("ENERGIA ELETRICA")
+            || upper.contains("CEMIG") || upper.contains("CPFL") || upper.contains("EQUATORIAL")
+            || upper.contains("COELBA") || upper.contains("COPEL") || upper.contains("LIGHT")
+            || upper.contains("CONTA DE LUZ") || upper.contains("CONTA DE ENERGIA")
+            || upper.contains("ENERGIA ELÉTRICA") || upper.contains("ENERGIA ELETRICA")
             || upper.contains("KWH")) {
             return "CONTA_DE_ENERGIA";
         }
         if (upper.contains("VIVO") || upper.contains("CLARO") || upper.contains("TIM ")
+            || upper.contains("TIM ULTRA") || upper.contains("OI FIBRA")
             || upper.contains("TELECOM") || upper.contains("TELEFONE") || upper.contains("BANDA LARGA")) {
             return "CONTA_DE_TELEFONE";
         }
         if (upper.contains("FATURA") && upper.contains("CART")) {
             return "FATURA_CARTAO";
+        }
+        if (upper.contains("CONTRATO DE ALUGUEL") || upper.contains("CONTRATO DE LOCA")) {
+            return "CONTRATO_ALUGUEL";
         }
         if (upper.contains("COMPROVANTE DE RESID")) {
             return "OUTROS";

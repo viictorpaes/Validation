@@ -153,9 +153,9 @@ public class GeminiDocumentInterpreter implements DocumentAiInterpreter {
             6. NUNCA emita decisão de aprovação ou reprovação.
             """;
 
-        String prompt = "Extraia os dados estruturados do comprovante abaixo (categoria informada no envio: "
-            + (informedType != null ? informedType.name() : "NAO_INFORMADO")
-            + "). Retorne null para campos não encontrados.\n\nTEXTO OCR:\n"
+        String prompt = "Extraia os dados estruturados do comprovante abaixo exclusivamente a partir do texto OCR. "
+            + "Classifique tipoDocumento apenas pelo conteúdo real do documento (não assuma um tipo sem evidência textual) "
+            + "e retorne null para campos não encontrados.\n\nTEXTO OCR:\n"
             + ocrText;
 
         Map<String, Object> properties = new LinkedHashMap<>();

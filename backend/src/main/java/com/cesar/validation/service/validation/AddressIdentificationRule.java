@@ -9,7 +9,7 @@ public class AddressIdentificationRule implements ValidationRule {
 
     @Override
     public int order() {
-        return 4;
+        return 5;
     }
 
     @Override

@@ -88,7 +88,7 @@ class DocumentAndDashboardIntegrationTest {
             .andExpect(jsonPath("$.validationStatus", is("APROVADO")))
             .andExpect(jsonPath("$.processingStatus", is("CONCLUIDO")))
             .andExpect(jsonPath("$.extractedData.cpf", is("529.***.***-25")))
-            .andExpect(jsonPath("$.appliedRules", hasSize(5)))
+            .andExpect(jsonPath("$.appliedRules", hasSize(6)))
             .andReturn();
 
         JsonNode createdJson = objectMapper.readTree(uploadResult.getResponse().getContentAsString());

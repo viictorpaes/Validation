@@ -32,6 +32,7 @@ class ResidenceValidationServiceTest {
 
         List<ValidationRule> rules = List.of(
             new LegibilityValidationRule(props),
+            new DocumentTypeConsistencyRule(),
             new HolderNameMatchRule(props),
             new CpfConsistencyRule(),
             new AddressIdentificationRule(),
@@ -69,8 +70,40 @@ class ResidenceValidationServiceTest {
         ResidenceValidationService.ValidationDecision decision = validationService.validate(ctx);
 
         assertEquals(ValidationStatus.APROVADO, decision.status());
-        assertEquals(5, decision.ruleResults().size());
+        assertEquals(6, decision.ruleResults().size());
         assertTrue(decision.ruleResults().stream().allMatch(r -> r.getOutcome() == RuleOutcome.PASSED));
+    }
+
+    @Test
+    @DisplayName("Deve reprovar quando usuário seleciona Conta de Água mas envia Conta de Energia")
+    void shouldRejectMismatchedDocumentType() {
+        LocalDate today = LocalDate.of(2026, 11, 25);
+        ExtractedDocumentDto extracted = new ExtractedDocumentDto(
+            "Maria Clara Oliveira Teste",
+            VALID_SYNTHETIC_CPF,
+            "Rua Projetada Alfa, 150",
+            "Recife",
+            "PE",
+            "50000000",
+            today.minusDays(10).toString(),
+            "CONTA_DE_ENERGIA",
+            List.of()
+        );
+
+        ValidationContext ctx = new ValidationContext(
+            "NEOENERGIA CONTA DE LUZ MARIA CLARA OLIVEIRA TESTE RUA PROJETADA ALFA 150 RECIFE PE",
+            extracted,
+            "Maria Clara Oliveira Teste",
+            VALID_SYNTHETIC_CPF,
+            DocumentType.CONTA_DE_AGUA,
+            true,
+            today
+        );
+
+        ResidenceValidationService.ValidationDecision decision = validationService.validate(ctx);
+
+        assertEquals(ValidationStatus.REPROVADO, decision.status());
+        assertTrue(decision.reasons().stream().anyMatch(m -> m.contains("Tipo de documento incompatível")));
     }
 
     @Test

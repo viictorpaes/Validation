@@ -16,7 +16,7 @@ public class HolderNameMatchRule implements ValidationRule {
 
     @Override
     public int order() {
-        return 2;
+        return 3;
     }
 
     @Override
