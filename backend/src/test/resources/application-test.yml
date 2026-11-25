@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:validation_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+app:
+  storage:
+    upload-dir: ./target/test-uploads
+    max-file-size-bytes: 10485760
+  ocr:
+    datapath: /usr/share/tessdata
+    language: por+eng
+  ai:
+    gemini:
+      api-key: ""
+      model: gemini-4-hydrogen
+      api-url: https://generativelanguage.googleapis.com/v1/interactions
+      timeout-seconds: 10
+      fallback-heuristic-enabled: true
+  validation:
+    max-document-age-days: 90
+    min-ocr-chars: 25
+    name-similarity-threshold: 0.60
